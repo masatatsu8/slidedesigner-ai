@@ -1,0 +1,5 @@
+{
+  "name": "InfographAI",
+  "description": "Turn text into professional 16:9 infographics with Gemini 3 Pro Image.",
+  "requestFramePermissions": []
+}
