@@ -3,6 +3,7 @@ import React, {
   useContext,
   useReducer,
   useCallback,
+  useRef,
   ReactNode,
 } from 'react';
 import { sessionService } from '../services/sessionService';
@@ -240,6 +241,8 @@ interface SessionProviderProps {
 
 export function SessionProvider({ children }: SessionProviderProps) {
   const [state, dispatch] = useReducer(sessionReducer, initialState);
+  // loadSession用のリクエストIDガード(古いリクエストの結果を破棄する)
+  const loadSessionRequestIdRef = useRef(0);
 
   // プロジェクトのセッション一覧を読み込み
   const loadSessionsForProject = useCallback(async (projectId: string) => {
@@ -278,11 +281,20 @@ export function SessionProvider({ children }: SessionProviderProps) {
 
   // セッション読み込み
   const loadSession = useCallback(async (id: string) => {
+    // リクエストIDをインクリメントして古いリクエストを無効化
+    const requestId = ++loadSessionRequestIdRef.current;
+
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
 
     try {
       const session = await sessionService.getSession(id);
+
+      // 別のセッションがロード開始された場合は結果を破棄
+      if (requestId !== loadSessionRequestIdRef.current) {
+        return;
+      }
+
       if (!session) {
         throw new Error('Session not found');
       }
@@ -296,14 +308,26 @@ export function SessionProvider({ children }: SessionProviderProps) {
         sessionService.getSessionStats(id),
       ]);
 
+      // 別のセッションがロード開始された場合は結果を破棄
+      if (requestId !== loadSessionRequestIdRef.current) {
+        return;
+      }
+
       dispatch({ type: 'SET_IMAGES', payload: images });
       dispatch({ type: 'SET_CONVERSATIONS', payload: conversations });
       dispatch({ type: 'SET_STATS', payload: stats });
     } catch (error) {
+      // 古いリクエストのエラーは無視
+      if (requestId !== loadSessionRequestIdRef.current) {
+        return;
+      }
       console.error('Failed to load session:', error);
       dispatch({ type: 'SET_ERROR', payload: 'セッションの読み込みに失敗しました' });
     } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      // 古いリクエストのfinallyは状態を更新しない
+      if (requestId === loadSessionRequestIdRef.current) {
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
     }
   }, []);
 
@@ -338,20 +362,31 @@ export function SessionProvider({ children }: SessionProviderProps) {
       generationType: 'initial' | 'refinement';
       parentImageId?: string | null;
     }): Promise<StoredImage> => {
-      if (!state.currentSession) {
+      // 現在のセッションIDを保存(非同期操作中に変更される可能性がある)
+      const currentSessionId = state.currentSession?.id;
+      if (!currentSessionId) {
         throw new Error('No current session');
       }
 
       const image = await sessionService.saveImage({
-        sessionId: state.currentSession.id,
+        sessionId: currentSessionId,
         ...params,
       });
 
       dispatch({ type: 'ADD_IMAGE', payload: image });
 
-      // 統計を更新
-      const stats = await sessionService.getSessionStats(state.currentSession.id);
-      dispatch({ type: 'SET_STATS', payload: stats });
+      // セッションが変更されていない場合のみ統計を更新
+      if (state.currentSession?.id === currentSessionId) {
+        try {
+          const stats = await sessionService.getSessionStats(currentSessionId);
+          // 再度セッションIDを確認
+          if (state.currentSession?.id === currentSessionId) {
+            dispatch({ type: 'SET_STATS', payload: stats });
+          }
+        } catch (error) {
+          console.error('Failed to update stats:', error);
+        }
+      }
 
       return image;
     },
@@ -360,13 +395,23 @@ export function SessionProvider({ children }: SessionProviderProps) {
 
   // 画像削除
   const deleteImage = useCallback(async (id: string) => {
+    // 現在のセッションIDを保存(非同期操作中に変更される可能性がある)
+    const currentSessionId = state.currentSession?.id;
+
     await sessionService.deleteImage(id);
     dispatch({ type: 'DELETE_IMAGE', payload: id });
 
-    // 統計を更新
-    if (state.currentSession) {
-      const stats = await sessionService.getSessionStats(state.currentSession.id);
-      dispatch({ type: 'SET_STATS', payload: stats });
+    // セッションが変更されていない場合のみ統計を更新
+    if (currentSessionId && state.currentSession?.id === currentSessionId) {
+      try {
+        const stats = await sessionService.getSessionStats(currentSessionId);
+        // 再度セッションIDを確認
+        if (state.currentSession?.id === currentSessionId) {
+          dispatch({ type: 'SET_STATS', payload: stats });
+        }
+      } catch (error) {
+        console.error('Failed to update stats:', error);
+      }
     }
   }, [state.currentSession]);
 

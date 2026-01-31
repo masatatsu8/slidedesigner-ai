@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL,
-    created_by_user_id TEXT NOT NULL,
+    created_by_user_id TEXT,
     name TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS conversations (
 CREATE TABLE IF NOT EXISTS presentations (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL,
-    created_by_user_id TEXT NOT NULL,
+    created_by_user_id TEXT,
     name TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
@@ -213,6 +213,10 @@ class DatabaseService {
    */
   private async loadFromOPFS(): Promise<Uint8Array | null> {
     try {
+      // navigatorが未定義の場合(テスト環境/SSR)はスキップ
+      if (typeof navigator === 'undefined') {
+        return null;
+      }
       if (!('storage' in navigator) || !('getDirectory' in navigator.storage)) {
         console.warn('OPFS is not supported, using in-memory database');
         return null;
@@ -238,6 +242,10 @@ class DatabaseService {
     }
 
     try {
+      // navigatorが未定義の場合(テスト環境/SSR)はスキップ
+      if (typeof navigator === 'undefined') {
+        return;
+      }
       if (!('storage' in navigator) || !('getDirectory' in navigator.storage)) {
         console.warn('OPFS is not supported, data will not be persisted');
         return;

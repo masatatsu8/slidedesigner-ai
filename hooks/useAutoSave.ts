@@ -122,6 +122,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}): UseAutoSaveReturn
  * 変更追跡付き自動保存フック
  *
  * データが変更されたときのみ保存を実行する。
+ * hasUnsavedChangesがfalseの場合、自動保存はスキップされる。
  */
 export function useAutoSaveWithTracking<T>(
   data: T,
@@ -129,18 +130,33 @@ export function useAutoSaveWithTracking<T>(
 ): UseAutoSaveReturn & { hasUnsavedChanges: boolean } {
   const previousDataRef = useRef<string>('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const hasUnsavedChangesRef = useRef(false); // コールバック内で参照するためのref
 
   const {
     onSave: originalOnSave,
+    enabled = true,
     ...restOptions
   } = options;
 
+  // hasUnsavedChangesの状態をrefと同期
+  useEffect(() => {
+    hasUnsavedChangesRef.current = hasUnsavedChanges;
+  }, [hasUnsavedChanges]);
+
   const onSave = useCallback(() => {
     setHasUnsavedChanges(false);
+    hasUnsavedChangesRef.current = false;
     originalOnSave?.();
   }, [originalOnSave]);
 
-  const autoSave = useAutoSave({ ...restOptions, onSave });
+  // 変更がある場合のみ保存を有効化
+  const effectiveEnabled = enabled && hasUnsavedChanges;
+
+  const autoSave = useAutoSave({
+    ...restOptions,
+    enabled: effectiveEnabled,
+    onSave,
+  });
 
   // データ変更を検知
   useEffect(() => {
@@ -148,6 +164,7 @@ export function useAutoSaveWithTracking<T>(
     if (currentData !== previousDataRef.current) {
       previousDataRef.current = currentData;
       setHasUnsavedChanges(true);
+      hasUnsavedChangesRef.current = true;
     }
   }, [data]);
 

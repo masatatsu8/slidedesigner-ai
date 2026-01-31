@@ -48,6 +48,10 @@ export async function saveImageToLocal(params: SaveImageParams): Promise<SavedIm
     body: JSON.stringify(params),
   });
 
+  if (!response.ok) {
+    throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+  }
+
   const result: ApiResponse<SavedImageInfo> = await response.json();
 
   if (!result.success || !result.data) {
@@ -62,6 +66,11 @@ export async function saveImageToLocal(params: SaveImageParams): Promise<SavedIm
  */
 export async function getSessionImages(projectId: string, sessionId: string): Promise<ImageInfo[]> {
   const response = await fetch(`${API_BASE_URL}/${projectId}/${sessionId}`);
+
+  if (!response.ok) {
+    throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+  }
+
   const result: ApiResponse<ImageInfo[]> = await response.json();
 
   if (!result.success || !result.data) {
@@ -87,6 +96,11 @@ export async function getImageAsBase64(
   filename: string
 ): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/${projectId}/${sessionId}/${filename}/base64`);
+
+  if (!response.ok) {
+    throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+  }
+
   const result: ApiResponse<{ filename: string; base64Data: string }> = await response.json();
 
   if (!result.success || !result.data) {
@@ -108,6 +122,10 @@ export async function deleteLocalImage(
     method: 'DELETE',
   });
 
+  if (!response.ok) {
+    throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+  }
+
   const result: ApiResponse<void> = await response.json();
 
   if (!result.success) {
@@ -122,6 +140,11 @@ export async function getProjectImages(
   projectId: string
 ): Promise<{ sessionId: string; images: ImageInfo[] }[]> {
   const response = await fetch(`${API_BASE_URL}/project/${projectId}`);
+
+  if (!response.ok) {
+    throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+  }
+
   const result: ApiResponse<{ sessionId: string; images: ImageInfo[] }[]> = await response.json();
 
   if (!result.success || !result.data) {
@@ -136,6 +159,11 @@ export async function getProjectImages(
  */
 export async function getFileApiInfo(): Promise<{ basePath: string }> {
   const response = await fetch(`${API_BASE_URL}/info`);
+
+  if (!response.ok) {
+    throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+  }
+
   const result: ApiResponse<{ basePath: string }> = await response.json();
 
   if (!result.success || !result.data) {

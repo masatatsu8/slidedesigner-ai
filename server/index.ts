@@ -6,7 +6,12 @@ const app = express();
 const PORT = process.env.PORT || 4101;
 
 // Middleware
-app.use(cors());
+// CORS: ローカル開発環境からのアクセスのみ許可
+app.use(cors({
+  origin: ['http://localhost:4100', 'http://127.0.0.1:4100'],
+  methods: ['GET', 'POST', 'DELETE'],
+  credentials: true,
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -24,9 +29,13 @@ app.get('/api/health', (_req, res) => {
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Server error:', err);
+  // 開発環境でのみ詳細なエラーメッセージを返す
+  const message = process.env.NODE_ENV === 'development'
+    ? err.message
+    : 'An error occurred while processing your request';
   res.status(500).json({
     error: 'Internal server error',
-    message: err.message,
+    message,
   });
 });
 
