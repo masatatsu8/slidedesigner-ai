@@ -243,6 +243,11 @@ export function SessionProvider({ children }: SessionProviderProps) {
   const [state, dispatch] = useReducer(sessionReducer, initialState);
   // loadSession用のリクエストIDガード(古いリクエストの結果を破棄する)
   const loadSessionRequestIdRef = useRef(0);
+  // 現在のセッションIDを追跡するref(コールバック内で最新値を参照するため)
+  const currentSessionIdRef = useRef<string | null>(null);
+
+  // currentSessionIdRefをstateと同期
+  currentSessionIdRef.current = state.currentSession?.id ?? null;
 
   // プロジェクトのセッション一覧を読み込み
   const loadSessionsForProject = useCallback(async (projectId: string) => {
@@ -363,24 +368,24 @@ export function SessionProvider({ children }: SessionProviderProps) {
       parentImageId?: string | null;
     }): Promise<StoredImage> => {
       // 現在のセッションIDを保存(非同期操作中に変更される可能性がある)
-      const currentSessionId = state.currentSession?.id;
-      if (!currentSessionId) {
+      const sessionIdAtStart = currentSessionIdRef.current;
+      if (!sessionIdAtStart) {
         throw new Error('No current session');
       }
 
       const image = await sessionService.saveImage({
-        sessionId: currentSessionId,
+        sessionId: sessionIdAtStart,
         ...params,
       });
 
       dispatch({ type: 'ADD_IMAGE', payload: image });
 
-      // セッションが変更されていない場合のみ統計を更新
-      if (state.currentSession?.id === currentSessionId) {
+      // セッションが変更されていない場合のみ統計を更新(refで最新値を確認)
+      if (currentSessionIdRef.current === sessionIdAtStart) {
         try {
-          const stats = await sessionService.getSessionStats(currentSessionId);
+          const stats = await sessionService.getSessionStats(sessionIdAtStart);
           // 再度セッションIDを確認
-          if (state.currentSession?.id === currentSessionId) {
+          if (currentSessionIdRef.current === sessionIdAtStart) {
             dispatch({ type: 'SET_STATS', payload: stats });
           }
         } catch (error) {
@@ -390,30 +395,30 @@ export function SessionProvider({ children }: SessionProviderProps) {
 
       return image;
     },
-    [state.currentSession]
+    [] // 依存配列を空に: refを通じて最新値にアクセスする
   );
 
   // 画像削除
   const deleteImage = useCallback(async (id: string) => {
     // 現在のセッションIDを保存(非同期操作中に変更される可能性がある)
-    const currentSessionId = state.currentSession?.id;
+    const sessionIdAtStart = currentSessionIdRef.current;
 
     await sessionService.deleteImage(id);
     dispatch({ type: 'DELETE_IMAGE', payload: id });
 
-    // セッションが変更されていない場合のみ統計を更新
-    if (currentSessionId && state.currentSession?.id === currentSessionId) {
+    // セッションが変更されていない場合のみ統計を更新(refで最新値を確認)
+    if (sessionIdAtStart && currentSessionIdRef.current === sessionIdAtStart) {
       try {
-        const stats = await sessionService.getSessionStats(currentSessionId);
+        const stats = await sessionService.getSessionStats(sessionIdAtStart);
         // 再度セッションIDを確認
-        if (state.currentSession?.id === currentSessionId) {
+        if (currentSessionIdRef.current === sessionIdAtStart) {
           dispatch({ type: 'SET_STATS', payload: stats });
         }
       } catch (error) {
         console.error('Failed to update stats:', error);
       }
     }
-  }, [state.currentSession]);
+  }, []); // 依存配列を空に: refを通じて最新値にアクセスする
 
   // 画像選択
   const selectImage = useCallback((id: string | null) => {

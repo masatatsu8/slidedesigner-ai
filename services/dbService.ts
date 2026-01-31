@@ -304,6 +304,10 @@ class DatabaseService {
 
     // OPFSからファイルを削除
     try {
+      // navigatorが未定義の場合(テスト環境/SSR)はスキップ
+      if (typeof navigator === 'undefined') {
+        return;
+      }
       if ('storage' in navigator && 'getDirectory' in navigator.storage) {
         const root = await navigator.storage.getDirectory();
         await root.removeEntry(this.DB_FILE_NAME);
@@ -567,14 +571,14 @@ class DatabaseService {
     return {
       id: row[0] as string,
       projectId: row[1] as string,
-      createdByUserId: row[2] as string,
+      createdByUserId: (row[2] as string | null) ?? '',
       name: row[3] as string,
       createdAt: row[4] as number,
       updatedAt: row[5] as number,
-      inputText: row[6] as string,
+      inputText: (row[6] as string | null) ?? '',
       complexity: row[7] as ComplexityLevel,
       resolution: row[8] as ImageResolution,
-      designRequests: row[9] as string,
+      designRequests: (row[9] as string | null) ?? '',
       styleImageBase64: row[10] as string | null,
     };
   }
@@ -596,14 +600,14 @@ class DatabaseService {
     return result[0].values.map((row) => ({
       id: row[0] as string,
       projectId: row[1] as string,
-      createdByUserId: row[2] as string,
+      createdByUserId: (row[2] as string | null) ?? '',
       name: row[3] as string,
       createdAt: row[4] as number,
       updatedAt: row[5] as number,
-      inputText: row[6] as string,
+      inputText: (row[6] as string | null) ?? '',
       complexity: row[7] as ComplexityLevel,
       resolution: row[8] as ImageResolution,
-      designRequests: row[9] as string,
+      designRequests: (row[9] as string | null) ?? '',
       styleImageBase64: row[10] as string | null,
     }));
   }
@@ -853,7 +857,7 @@ class DatabaseService {
     return {
       id: row[0] as string,
       projectId: row[1] as string,
-      createdByUserId: row[2] as string,
+      createdByUserId: (row[2] as string | null) ?? '',
       name: row[3] as string,
       createdAt: row[4] as number,
       updatedAt: row[5] as number,
@@ -877,7 +881,7 @@ class DatabaseService {
     return result[0].values.map((row) => ({
       id: row[0] as string,
       projectId: row[1] as string,
-      createdByUserId: row[2] as string,
+      createdByUserId: (row[2] as string | null) ?? '',
       name: row[3] as string,
       createdAt: row[4] as number,
       updatedAt: row[5] as number,
