@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { dbService } from '../services/dbService';
 
 interface UseAutoSaveOptions {
@@ -35,23 +35,27 @@ export function useAutoSave(options: UseAutoSaveOptions = {}): UseAutoSaveReturn
     onError,
   } = options;
 
-  const lastSavedAtRef = useRef<number | null>(null);
-  const isSavingRef = useRef(false);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isSavingRef = useRef(false); // 重複保存防止用
 
   const saveNow = useCallback(async () => {
     if (isSavingRef.current) return;
 
     isSavingRef.current = true;
+    setIsSaving(true);
     try {
       await dbService.persist();
-      lastSavedAtRef.current = Date.now();
+      const now = Date.now();
+      setLastSavedAt(now);
       onSave?.();
     } catch (error) {
       console.error('Auto-save failed:', error);
       onError?.(error instanceof Error ? error : new Error(String(error)));
     } finally {
       isSavingRef.current = false;
+      setIsSaving(false);
     }
   }, [onSave, onError]);
 
@@ -109,8 +113,8 @@ export function useAutoSave(options: UseAutoSaveOptions = {}): UseAutoSaveReturn
 
   return {
     saveNow,
-    lastSavedAt: lastSavedAtRef.current,
-    isSaving: isSavingRef.current,
+    lastSavedAt,
+    isSaving,
   };
 }
 
@@ -124,7 +128,7 @@ export function useAutoSaveWithTracking<T>(
   options: UseAutoSaveOptions = {}
 ): UseAutoSaveReturn & { hasUnsavedChanges: boolean } {
   const previousDataRef = useRef<string>('');
-  const hasUnsavedChangesRef = useRef(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const {
     onSave: originalOnSave,
@@ -132,7 +136,7 @@ export function useAutoSaveWithTracking<T>(
   } = options;
 
   const onSave = useCallback(() => {
-    hasUnsavedChangesRef.current = false;
+    setHasUnsavedChanges(false);
     originalOnSave?.();
   }, [originalOnSave]);
 
@@ -143,12 +147,12 @@ export function useAutoSaveWithTracking<T>(
     const currentData = JSON.stringify(data);
     if (currentData !== previousDataRef.current) {
       previousDataRef.current = currentData;
-      hasUnsavedChangesRef.current = true;
+      setHasUnsavedChanges(true);
     }
   }, [data]);
 
   return {
     ...autoSave,
-    hasUnsavedChanges: hasUnsavedChangesRef.current,
+    hasUnsavedChanges,
   };
 }
